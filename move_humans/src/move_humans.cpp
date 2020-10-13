@@ -557,6 +557,7 @@ bool MoveHumans::executeCycle(move_humans::map_pose &goals,
     }
 
     if (reset_controller_plans_) {
+      // std::cout << "I am in reset" << '\n';
       reset_controller_plans_ = false;
       new_external_controller_trajs_ = false;
       move_humans::map_traj_point new_human_pts;
@@ -664,6 +665,7 @@ bool MoveHumans::executeCycle(move_humans::map_pose &goals,
       ROS_DEBUG_NAMED(NODE_NAME,
                       "Got valid human positions from the controller");
       publishHumans(current_human_points);
+
       // publishing feedback is critical, do not disable it unless necessary
       if (publish_feedback_) {
         auto now = ros::Time::now();
@@ -672,6 +674,7 @@ bool MoveHumans::executeCycle(move_humans::map_pose &goals,
         for (auto &point_kv : current_human_points) {
           auto &human_id = point_kv.first;
           auto &human_traj_point = point_kv.second;
+          // std::cout << "point_kv.second" << point_kv.second << '\n';
 
           geometry_msgs::PoseStamped pose;
           pose.header.stamp = now;
@@ -1055,6 +1058,7 @@ void MoveHumans::publishHumans(const move_humans::map_traj_point &human_pts) {
 
   for (auto &human_pt_kv : human_pts) {
     last_published_humans_[human_pt_kv.first] = human_pt_kv.second;
+    // std::cout << "I am here" << '\n';
   }
 
   hanp_msgs::TrackedHumans humans;
@@ -1082,6 +1086,7 @@ void MoveHumans::publishHumans(const move_humans::map_traj_point &human_pts) {
     humans.humans.push_back(human);
 
     if (publish_human_markers) {
+      // std::cout << "in the publish if" << '\n';
       visualization_msgs::Marker human_arrow, human_cylinder;
 
       human_arrow.header.stamp = now;

@@ -10,6 +10,9 @@
 #include <move_humans/controller_interface.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2_ros/transform_listener.h>
+#include <hanp_msgs/HumanTwistArray.h>
+#include <hanp_msgs/TrackedHumans.h>
+#include <hanp_msgs/TrackedSegmentType.h>
 
 #include <teleport_controller/TeleportControllerConfig.h>
 
@@ -43,6 +46,8 @@ public:
 
   bool areGoalsReached(move_humans::id_vector &reached_humans);
 
+  void HumansCallback(const hanp_msgs::TrackedHumans & humans);
+
   bool isInitialized() { return initialized_; }
 
 private:
@@ -54,15 +59,17 @@ private:
   costmap_2d::Costmap2DROS *costmap_ros_;
   tf2_ros::Buffer *tf2_;
 
-  ros::Publisher plans_pub_;
+  ros::Publisher plans_pub_, vels_pub_;
+  ros::Subscriber sim_humans_sub_;
 
   move_humans::map_pose_vector plans_;
   move_humans::map_trajectory trajs_;
   move_humans::map_twist vels_;
-  move_humans::map_traj_point last_traj_points_;
+  move_humans::map_traj_point last_traj_points_, last_human_points_;
   move_humans::map_size last_traversed_indices_;
   move_humans::map_trajectory last_transformed_trajs_;
   move_humans::id_vector reached_goals_;
+  hanp_msgs::TrackedHumans tracked_humans_;
   double sq_dist_threshold_, goal_reached_threshold_;
   std::string controller_frame_;
 

@@ -156,6 +156,8 @@ void MoveHumansClient::clientThread() {
   //   ROS_INFO_NAMED(NODE_NAME, "move_humans did not finish before timeout");
   // }
 }
+//TODO
+//Change this function to obtain the data from the simulator or supervisor
 
 bool MoveHumansClient::getHumansGoals(ros::NodeHandle &nh,
                                       move_humans::map_pose &starts,
