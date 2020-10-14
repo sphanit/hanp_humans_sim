@@ -252,7 +252,7 @@ bool TeleportController::computeHumansStates(
       continue;
     }
     // last_traj_point.transform.translation = projected_last_trans;
-    last_traj_point.transform.rotation = transformed_traj.points[next_point_index].transform.rotation;
+    // last_traj_point.transform.rotation = transformed_traj.points[next_point_index].transform.rotation;
 
     // not updating time and velocity of last_traj_point;
 
@@ -430,7 +430,6 @@ bool TeleportController::computeHumansStates(
         // ROS_INFO("ad=%.2f, cad=%.2f, rad=%.2f", angular_dist, can_ang_dist,
         //          ratio_ang_dist);
 
-        // double cur_theta = tf::getYaw(last_point.transform.rotation);
         // velocity.linear.x = 5*((pose.position.x-h_pose.position.x)*std::cos(theta)+(pose.position.x-h_pose.position.x)*std::sin(theta));
         // velocity.linear.y = 5*((pose.position.y-h_pose.position.y)*std::sin(theta)+(pose.position.y-h_pose.position.y)*std::cos(theta));
         // velocity.angular.z =  5*angles::shortest_angular_distance(tf::getYaw(h_pose.orientation),tf::getYaw(pose.orientation));
@@ -440,19 +439,25 @@ bool TeleportController::computeHumansStates(
                                      last_traj_point.transform.translation.x,
                                  last_point.transform.translation.y -
                                      last_traj_point.transform.translation.y);
+
         // last_point.velocity.linear.x = linear_dist / cycle_time;
         last_point.velocity.linear.x = (last_point.transform.translation.x - last_traj_point.transform.translation.x)/cycle_time;
         last_point.velocity.linear.y = (last_point.transform.translation.y - last_traj_point.transform.translation.y)/cycle_time;
-        angular_dist = angles::shortest_angular_distance(tf::getYaw(last_traj_point.transform.rotation),tf::getYaw(last_point.transform.rotation));
-        // std::cout << "angular_dist" << angular_dist<< '\n';
-// tf::getYaw(last_point.transform.rotation) - tf::getYaw(last_traj_point.transform.rotation)
+        // angular_dist = angles::shortest_angular_distance(tf::getYaw(last_traj_point.transform.rotation),tf::getYaw(last_point.transform.rotation));
+        angular_dist =  tf::getYaw(last_point.transform.rotation) - tf::getYaw(last_traj_point.transform.rotation);
         last_point.velocity.angular.z = angular_dist / cycle_time;
         last_point.time_from_start.fromSec(-1.0);
 
-        human_vel.twist.linear.x = last_point.velocity.linear.x;
-        human_vel.twist.linear.y = last_point.velocity.linear.y;
-        human_vel.twist.angular.z = last_point.velocity.angular.z;
-        humans_vels_array.twists.push_back(human_vel);
+        //Velocity calculation for the simulator
+        double cur_theta = tf::getYaw(last_traj_point.transform.rotation);
+        double deltaS_x = (last_point.transform.translation.x - last_traj_point.transform.translation.x);
+        double deltaS_y = (last_point.transform.translation.y - last_traj_point.transform.translation.y);
+
+        human_vel.twist.linear.x = (deltaS_x*std::cos(cur_theta)+deltaS_y*std::sin(cur_theta))/cycle_time;
+        human_vel.twist.linear.y = (-deltaS_x*std::sin(cur_theta)+deltaS_y*std::cos(cur_theta))/cycle_time;
+
+        human_vel.twist.angular.z = angles::shortest_angular_distance(tf::getYaw(last_traj_point.transform.rotation),std::atan2(deltaS_y, deltaS_x));
+
 
       }
     }
@@ -470,11 +475,17 @@ bool TeleportController::computeHumansStates(
                                         next_point_index - 1);
     }
     transformed_traj.points.insert(transformed_traj.points.begin(), last_point);
+
+    // if(transformed_traj.points.size() < 10)
+    //   human_vel.twist.angular.z = last_point.velocity.angular.z;
+
+    humans_vels_array.twists.push_back(human_vel);
+
   }
 
   // velocity control mode
   for (auto &vel_kv : vels_) {
-    std::cout << "Enteererererree" << '\n';
+    // std::cout << "Enteererererree" << '\n';
     auto last_traj_points_it = last_traj_points_.find(vel_kv.first);
     auto &vel = vel_kv.second;
     if (last_traj_points_it != last_traj_points_.end()) {
@@ -512,19 +523,13 @@ bool TeleportController::computeHumansStates(
   auto sim_last_time = sim_time_now;
   double sim_cycle_time = 1.0/60; //simulator frequency
 
-  while((sim_time_now-sim_last_time).toSec() <= cycle_time + sim_cycle_time){
+  while((sim_time_now-sim_last_time).toSec() <= sim_cycle_time + cycle_time){
     vels_pub_.publish(humans_vels_array);
     sim_time_now = ros::Time::now();
   }
   //Publish Zero velocity now to stop human from moving
   vels_pub_.publish(zero_humans_vels_array);
 
-  //TODO
-  // Use the veolcities obtained from simulator to update the data (from simulator)
-
-  //TODO
-  //Update the Human positions here (from simulator)
-  // last_traj_points_ = last_human_points_;
   humans = last_human_points_;
   // humans = last_human_points_;
   for (auto &human_id : reached_goals_) {
@@ -553,6 +558,49 @@ bool TeleportController::areGoalsReached(
   reached_humans = reached_goals_;
   return true;
 }
+
+bool TeleportController::allGoalsReached(move_humans::map_pose goals){
+  std::vector<bool> all_reached;
+  double dx = 0.0, dy=0.0, delta_orient=0.0;
+
+  for (auto &traj_kv : last_human_points_) {
+    auto &human_id = traj_kv.first;
+
+    auto goal = goals[human_id];
+    auto human = last_human_points_[human_id];
+
+    dx = goal.pose.position.x - human.transform.translation.x;
+    dy = goal.pose.position.y - human.transform.translation.y;
+
+    delta_orient = normalize_theta(tf::getYaw(goal.pose.orientation)-tf::getYaw(human.transform.rotation));
+    if((((fabs(std::sqrt(dx*dx+dy*dy)) <=0.2 && fabs(delta_orient) <=0.1))))
+      all_reached.push_back(true);
+    else
+      all_reached.push_back(false);
+
+    return(std::all_of(all_reached.begin(), all_reached.end(), [](bool i){return i && true;}));
+  }
+
+  return false;
+  // for(int i=0;i<all_reached.size();i++){
+  //   std::cout << "all_reached_" <<i<<all_reached[i] << '\n';
+  // }
+
+}
+
+double TeleportController::normalize_theta(double theta)
+ {
+   if (theta >= -M_PI && theta < M_PI)
+     return theta;
+
+   double multiplier = floor(theta / (2*M_PI));
+   theta = theta - multiplier*2*M_PI;
+   if (theta >= M_PI)
+     theta -= 2*M_PI;
+   if (theta < -M_PI)
+     theta += 2*M_PI;
+   return theta;
+ }
 
 bool TeleportController::transformPlansAndTrajs(
     const move_humans::map_pose_vector &plans,
@@ -599,7 +647,8 @@ bool TeleportController::transformPlansAndTrajs(
     }
 
     if (plan[0].header.frame_id != controller_frame_) {
-      // std::cout << "planning here" << '\n';
+      std::cout << "planning different frames" << '\n';
+      std::cout << "controller_frame_ "<< controller_frame_ << '\n';
       ROS_INFO("plan %s controller %s", plan[0].header.frame_id.c_str(),
                controller_frame_.c_str());
       try {

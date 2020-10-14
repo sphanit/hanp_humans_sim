@@ -24,6 +24,8 @@ public:
 
   virtual bool areGoalsReached(move_humans::id_vector &reached_humans) = 0;
 
+  virtual bool allGoalsReached(move_humans::map_pose goals) = 0;
+
 protected:
   ControllerInterface() {}
 };

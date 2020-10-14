@@ -651,6 +651,11 @@ bool MoveHumans::executeCycle(move_humans::map_pose &goals,
         all_human_goals_reached = false;
       }
     }
+
+    // if(!controller_->allGoalsReached(goals)){
+    //   all_human_goals_reached = false;
+    // }
+
     if (all_human_goals_reached) {
       ROS_INFO_NAMED(NODE_NAME, "All goals reached!");
       mhas_->setSucceeded(move_humans::MoveHumansResult(), "Goals reached");

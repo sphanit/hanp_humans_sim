@@ -48,6 +48,10 @@ public:
 
   void HumansCallback(const hanp_msgs::TrackedHumans & humans);
 
+  bool allGoalsReached(move_humans::map_pose goals);
+
+  double normalize_theta(double theta);
+
   bool isInitialized() { return initialized_; }
 
 private:
